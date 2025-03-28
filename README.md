@@ -1,46 +1,36 @@
-# Feature_Request_Voting
-a Feature Request + Voting System for an imaginary product. Many real-world products have dedicated portals for collecting user feedback and prioritizing new features based on user votes
-Feature Request + Voting System
-Assignment Requirements Document
-Overview
-In this assignment, students will build a Feature Request + Voting System for an imaginary product. Many real-world products have dedicated portals for collecting user feedback and prioritizing new features based on user votes. This project will help students practice full-stack development using Next.js, NextAuth, Prisma, and MySQL.
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Tech Stack
-Frontend: Next.js (React)
-Backend: Next.js API routes
-Authentication: NextAuth.js (email/password)
-Database: MySQL (or PostgreSQL)
-ORM: Prisma
-Core Features
-1. User Authentication
-Implement NextAuth.js with email/password authentication.
-Users must log in to submit feature requests or upvote.
-Use session management to persist login state.
-2. Feature Request Submission
-Once logged in, users can submit new feature requests.
-Each request must include:
-Title (Required, max 100 characters)
-Description (Required, max 500 characters)
-The system should store:
-The user ID of the creator.
-A timestamp for when the request was submitted.
-3. Feature Request Listing
-A public list of all submitted feature requests.
-Sorted by the number of upvotes (highest first).
-4. Upvoting & Removing Votes
-Logged-in users can upvote any feature request.
-Each user can only vote once per feature.
-Users should also be able to remove their vote.
+## Getting Started
 
+First, run the development server:
 
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Learn More
 
+To learn more about Next.js, take a look at the following resources:
 
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-Stretch Goals (Optional Enhancements)
-If you finish the core functionality, and want to keep going with it, you can add extra features:
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-Admin Dashboard: An admin role that can mark features as "Planned" or "Completed".
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
