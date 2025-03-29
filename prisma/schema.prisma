@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+    USER
+    ADMIN
+}
+
+enum FeatureStatus {
+    OPEN
+    PLANNED
+    IN_PROGRESS
+    COMPLETED
+}
+
+model User {
+    id              String           @id @default(uuid())
+    email           String           @unique
+    password        String
+    name            String?
+    role            UserRole         @default(USER)
+    createdAt       DateTime         @default(now()) @map("created_at")
+    updatedAt       DateTime         @updatedAt @map("updated_at")
+    featureRequests FeatureRequest[]
+    votes           Vote[]
+    Comment         Comment[]
+
+    @@map("users")
+}
+
+model FeatureRequest {
+    id          String        @id @default(uuid())
+    title       String        @db.VarChar(100)
+    description String        @db.Text
+    status      FeatureStatus @default(OPEN)
+    userId      String        @map("user_id")
+    createdAt   DateTime      @default(now()) @map("created_at")
+    updatedAt   DateTime      @updatedAt @map("updated_at")
+    user        User          @relation(fields: [userId], references: [id])
+    votes       Vote[]
+    Comment     Comment[]
+
+    @@map("feature_requests")
+}
+
+model Vote {
+    id               String         @id @default(uuid())
+    userId           String         @map("user_id")
+    featureRequestId String         @map("feature_request_id")
+    createdAt        DateTime       @default(now()) @map("created_at")
+    user             User           @relation(fields: [userId], references: [id])
+    featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id])
+
+    @@unique([userId, featureRequestId])
+    @@map("votes")
+}
+
+// Optional: Comments model for stretch goal
+model Comment {
+    id               String         @id @default(uuid())
+    content          String         @db.Text
+    userId           String         @map("user_id")
+    featureRequestId String         @map("feature_request_id")
+    createdAt        DateTime       @default(now()) @map("created_at")
+    updatedAt        DateTime       @updatedAt @map("updated_at")
+    user             User           @relation(fields: [userId], references: [id])
+    featureRequest   FeatureRequest @relation(fields: [featureRequestId], references: [id])
+
+    @@map("comments")
+}
