@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
 
 type SessionUser = {
   id: string;
@@ -20,13 +22,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { title, description } = body;
+    const formData = await request.formData();
+    const title = formData.get('title') as string;
+    const description = formData.get('description') as string;
+    const justification = formData.get('justification') as string;
+    const priority = formData.get('priority') as 'LOW' | 'MEDIUM' | 'HIGH';
+    const attachments = formData.getAll('attachments') as File[];
 
-    if (!title || !description) {
+    if (!title || !description || !justification || !priority) {
       return NextResponse.json(
-        { error: 'Title and description are required' },
+        { error: 'Title, description, justification, and priority are required' },
         { status: 400 }
+      );
+    }
+
+    // Handle file uploads
+    const attachmentUrls: string[] = [];
+    if (attachments.length > 0) {
+      const uploadDir = join(process.cwd(), 'public', 'uploads');
+      await Promise.all(
+        attachments.map(async (file) => {
+          const bytes = await file.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          const fileName = `${Date.now()}-${file.name}`;
+          const filePath = join(uploadDir, fileName);
+          await writeFile(filePath, buffer);
+          attachmentUrls.push(`/uploads/${fileName}`);
+        })
       );
     }
 
@@ -34,8 +56,11 @@ export async function POST(request: Request) {
       data: {
         title,
         description,
+        justification,
+        priority,
         status: 'OPEN',
         userId: user.id,
+        attachments: JSON.stringify(attachmentUrls),
       },
       include: {
         user: {

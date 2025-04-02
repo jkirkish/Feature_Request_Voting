@@ -22,6 +22,12 @@ enum FeatureStatus {
     COMPLETED
 }
 
+enum Priority {
+    LOW
+    MEDIUM
+    HIGH
+}
+
 model User {
     id              String           @id @default(uuid())
     email           String           @unique
@@ -38,18 +44,21 @@ model User {
 }
 
 model FeatureRequest {
-    id          String        @id @default(uuid())
-    title       String        @db.VarChar(100)
-    description String        @db.Text
-    status      FeatureStatus @default(OPEN)
-    userId      String        @map("user_id")
-    createdAt   DateTime      @default(now()) @map("created_at")
-    updatedAt   DateTime      @updatedAt @map("updated_at")
-    user        User          @relation(fields: [userId], references: [id])
-    votes       Vote[]
-    Comment     Comment[]
+    id            String        @id @default(cuid())
+    title         String
+    description   String
+    justification String
+    priority      Priority      @default(MEDIUM)
+    status        FeatureStatus @default(OPEN)
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @updatedAt
+    userId        String
+    user          User          @relation(fields: [userId], references: [id])
+    votes         Vote[]
+    attachments   String        @default("[]")
+    Comment       Comment[]
 
-    @@map("feature_requests")
+    @@index([userId])
 }
 
 model Vote {

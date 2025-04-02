@@ -67,15 +67,30 @@ export default function FeaturesPage() {
     }
   };
 
-  const handleCreateFeature = async (data: { title: string; description: string }) => {
+  const handleCreateFeature = async (data: {
+    title: string;
+    description: string;
+    justification: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH';
+    attachments?: File[];
+  }) => {
     try {
       setError(null);
+      const formData = new FormData();
+      formData.append('title', data.title);
+      formData.append('description', data.description);
+      formData.append('justification', data.justification);
+      formData.append('priority', data.priority);
+
+      if (data.attachments) {
+        data.attachments.forEach((file, index) => {
+          formData.append(`attachments`, file);
+        });
+      }
+
       const response = await fetch('/api/features', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -175,8 +190,8 @@ export default function FeaturesPage() {
               description={feature.description}
               status={feature.status}
               voteCount={feature.votes.length}
-              createdAt={feature.createdAt.toISOString()}
-              creator={feature.creator}
+              createdAt={new Date(feature.createdAt).toISOString()}
+              creator={{ name: feature.user?.name || null }}
               hasVoted={feature.votes.some(vote => vote.userId === user?.id)}
               onVote={handleVote}
               onRemoveVote={handleRemoveVote}
