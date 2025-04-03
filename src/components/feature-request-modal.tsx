@@ -55,11 +55,11 @@ export function FeatureRequestModal({ isOpen, onClose, onSubmit }: FeatureReques
   return (
     <Dialog open={isOpen} onClose={onClose} className="fixed inset-0 z-10 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center">
-        <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+        <Dialog.Overlay className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm" />
 
-        <div className="relative bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+        <div className="relative modal-content rounded-lg p-6 w-full max-w-2xl mx-4">
           <div className="flex justify-between items-center mb-4">
-            <Dialog.Title className="text-xl font-semibold text-gray-900">
+            <Dialog.Title className="text-2xl font-semibold text-gray-900">
               Submit Feature Request
             </Dialog.Title>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-500">

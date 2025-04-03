@@ -81,7 +81,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     const user = session?.user as SessionUser;
@@ -90,7 +90,32 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get the URL parameters
+    const { searchParams } = new URL(request.url);
+    const sortBy = searchParams.get('sortBy') || 'votes';
+    const status = searchParams.get('status');
+
+    // Define the where clause for status filtering
+    const where = status && status !== 'ALL' ? { status: status as any } : undefined;
+
+    // Define the orderBy clause based on sortBy parameter
+    let orderBy: Prisma.FeatureRequestOrderByWithRelationInput[] = [];
+    
+    switch (sortBy) {
+      case 'newest':
+        orderBy = [{ createdAt: 'desc' }];
+        break;
+      case 'oldest':
+        orderBy = [{ createdAt: 'asc' }];
+        break;
+      case 'votes':
+      default:
+        orderBy = [{ votes: { _count: 'desc' } }, { createdAt: 'desc' }];
+        break;
+    }
+
     const features = await prisma.featureRequest.findMany({
+      where,
       include: {
         user: {
           select: {
@@ -99,11 +124,7 @@ export async function GET() {
         },
         votes: true,
       },
-      orderBy: {
-        votes: {
-          _count: 'desc',
-        },
-      },
+      orderBy,
     });
 
     return NextResponse.json(features);

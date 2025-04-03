@@ -1,170 +1,322 @@
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
+'use client';
 
-type FeatureWithUser = {
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import { Button } from '@/components/ui/button';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { FeatureStatus } from '@prisma/client';
+import Link from 'next/link';
+
+type User = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  isAdmin: boolean;
+};
+
+type Feature = {
   id: string;
   title: string;
   description: string;
-  status: string;
-  createdAt: Date;
+  status: FeatureStatus;
+  createdAt: string;
   user: {
     name: string | null;
-  };
+    email: string | null;
+  } | null;
 };
 
-async function getStats() {
-  const [totalUsers, totalFeatures, totalVotes] = await Promise.all([
-    prisma.user.count(),
-    prisma.featureRequest.count(),
-    prisma.vote.count(),
-  ]);
+export default function AdminPage() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const recentFeatures = (await prisma.featureRequest.findMany({
-    take: 5,
-    orderBy: {
-      createdAt: 'desc',
-    },
-    include: {
-      user: {
-        select: {
-          name: true,
-        },
-      },
-    },
-  })) as FeatureWithUser[];
+  useEffect(() => {
+    const checkAdminAndFetchData = async () => {
+      try {
+        // Check if user is admin
+        const response = await fetch('/api/admin/check');
+        if (!response.ok) {
+          router.push('/features');
+          return;
+        }
 
-  return {
-    totalUsers,
-    totalFeatures,
-    totalVotes,
-    recentFeatures,
+        // Fetch users and features
+        await Promise.all([fetchUsers(), fetchFeatures()]);
+      } catch (error) {
+        console.error('Error:', error);
+        setError('Failed to load admin data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAdminAndFetchData();
+  }, [router]);
+
+  const fetchUsers = async () => {
+    const response = await fetch('/api/admin/users');
+    if (response.ok) {
+      const data = await response.json();
+      setUsers(data);
+    }
   };
-}
 
-export default async function AdminDashboard() {
-  const stats = await getStats();
+  const fetchFeatures = async () => {
+    const response = await fetch('/api/admin/features');
+    if (response.ok) {
+      const data = await response.json();
+      setFeatures(data);
+    }
+  };
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Dashboard Overview</h1>
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      });
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-6 w-6 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Users</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.totalUsers}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-6 w-6 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Feature Requests</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.totalFeatures}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to delete user');
+    }
+  };
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-6 w-6 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Votes</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.totalVotes}</dd>
-                </dl>
-              </div>
-            </div>
+  const handleDeleteAllUsers = async () => {
+    if (!confirm('Are you sure you want to delete all users? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete all users');
+      }
+
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to delete all users');
+    }
+  };
+
+  const handleDeleteFeature = async (featureId: string) => {
+    try {
+      const response = await fetch(`/api/admin/features/${featureId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete feature');
+      }
+
+      await fetchFeatures();
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to delete feature');
+    }
+  };
+
+  const handleDeleteAllFeatures = async () => {
+    if (!confirm('Are you sure you want to delete all features? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/features', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete all features');
+      }
+
+      await fetchFeatures();
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to delete all features');
+    }
+  };
+
+  const handleUpdateFeatureStatus = async (featureId: string, status: FeatureStatus) => {
+    try {
+      const response = await fetch(`/api/features/${featureId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update feature status');
+      }
+
+      await fetchFeatures();
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Failed to update feature status');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-container min-h-screen py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="content-overlay p-8">
+            <p className="text-center">Loading...</p>
           </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Feature Requests</h3>
-        </div>
-        <div className="border-t border-gray-200">
-          <ul className="divide-y divide-gray-200">
-            {stats.recentFeatures.map(feature => (
-              <li key={feature.id} className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-primary-600 truncate">
-                    {feature.title}
-                  </div>
-                  <div className="ml-2 flex-shrink-0 flex">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      {feature.status}
-                    </span>
+  return (
+    <div className="bg-container min-h-screen py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="content-overlay p-8 mb-8">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <div className="flex space-x-4">
+              <Link href="/admin/instructions">
+                <Button variant="outline" className="border-gray-300">
+                  Admin Setup Instructions
+                </Button>
+              </Link>
+              <Button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                variant="outline"
+                className="border-red-500 text-red-500 hover:bg-red-50"
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-red-50 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{error}</p>
                   </div>
                 </div>
-                <div className="mt-2 sm:flex sm:justify-between">
-                  <div className="sm:flex">
-                    <p className="flex items-center text-sm text-gray-500">
-                      {feature.user.name || 'Anonymous'}
-                    </p>
-                  </div>
-                  <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                    <p>{new Date(feature.createdAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Users Section */}
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold text-gray-900">Users</h2>
+              <Button
+                onClick={handleDeleteAllUsers}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete All Users
+              </Button>
+            </div>
+            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+              <ul className="divide-y divide-gray-200">
+                {users.map(user => (
+                  <li key={user.id} className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {user.name || 'Anonymous'}
+                        </p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                        {user.isAdmin && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => handleDeleteUser(user.id)}
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Features Section */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold text-gray-900">Features</h2>
+              <Button
+                onClick={handleDeleteAllFeatures}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete All Features
+              </Button>
+            </div>
+            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+              <ul className="divide-y divide-gray-200">
+                {features.map(feature => (
+                  <li key={feature.id} className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 mr-4">
+                        <p className="text-sm font-medium text-gray-900">{feature.title}</p>
+                        <p className="text-sm text-gray-500">{feature.description}</p>
+                        <p className="text-xs text-gray-400">
+                          Created by {feature.user?.name || 'Anonymous'} (
+                          {feature.user?.email || 'no email'})
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <select
+                          value={feature.status}
+                          onChange={e =>
+                            handleUpdateFeatureStatus(feature.id, e.target.value as FeatureStatus)
+                          }
+                          className="rounded-md border-gray-300 py-1 pl-2 pr-8 text-sm font-medium focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        >
+                          {Object.values(FeatureStatus).map(status => (
+                            <option key={status} value={status}>
+                              {status.replace('_', ' ')}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          onClick={() => handleDeleteFeature(feature.id)}
+                          variant="destructive"
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
