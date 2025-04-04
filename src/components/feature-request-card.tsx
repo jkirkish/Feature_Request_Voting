@@ -3,23 +3,26 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatDistanceToNow } from 'date-fns';
-import { FeatureStatus } from '@prisma/client';
+import { FeatureStatus, FeatureRequest, Vote } from '@prisma/client';
+
+type FeatureWithVotes = FeatureRequest & {
+  votes: Vote[];
+  user: {
+    name: string | null;
+  } | null;
+};
 
 interface FeatureRequestCardProps {
-  id: string;
-  title: string;
-  description: string;
-  status: FeatureStatus;
-  voteCount: number;
-  createdAt: string;
-  creator: {
-    name: string | null;
-  };
-  hasVoted: boolean;
+  feature: FeatureWithVotes;
   onVote: (id: string) => Promise<void>;
   onRemoveVote: (id: string) => Promise<void>;
   onUpdateStatus: (id: string, status: FeatureStatus) => Promise<void>;
-  isAdmin?: boolean;
+  currentUser: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
 }
 
 const statusColors = {
@@ -37,96 +40,95 @@ const statusOptions: { value: FeatureStatus; label: string }[] = [
 ];
 
 export function FeatureRequestCard({
-  id,
-  title,
-  description,
-  status,
-  voteCount,
-  createdAt,
-  creator,
-  hasVoted,
+  feature,
   onVote,
   onRemoveVote,
   onUpdateStatus,
-  isAdmin = false,
+  currentUser,
 }: FeatureRequestCardProps) {
-  const { data: session } = useSession();
-  const [isVoting, setIsVoting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const isAdmin = currentUser?.email?.endsWith('@yourcompany.com') || false;
+  const hasVoted = feature.votes.some(vote => vote.userId === currentUser?.id);
 
   const handleVote = async () => {
-    if (!session) return;
-    setIsVoting(true);
+    if (isUpdating) return;
+    setIsUpdating(true);
     try {
       if (hasVoted) {
-        await onRemoveVote(id);
+        await onRemoveVote(feature.id);
       } else {
-        await onVote(id);
+        await onVote(feature.id);
       }
     } finally {
-      setIsVoting(false);
+      setIsUpdating(false);
     }
   };
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value as FeatureStatus;
+    if (isUpdating) return;
     setIsUpdating(true);
     try {
-      await onUpdateStatus(id, newStatus);
+      await onUpdateStatus(feature.id, e.target.value as FeatureStatus);
     } finally {
       setIsUpdating(false);
     }
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900">{title}</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Posted by {creator.name || 'Anonymous'}{' '}
-            {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
-          </p>
-        </div>
-        {isAdmin ? (
-          <select
-            value={status}
-            onChange={handleStatusChange}
-            disabled={isUpdating}
-            className={`rounded-md border-gray-300 py-1 pl-2 pr-8 text-sm font-medium focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 ${
-              isUpdating ? 'opacity-50' : ''
-            }`}
-          >
-            {statusOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status]}`}
-          >
-            {status.replace('_', ' ')}
-          </span>
-        )}
-      </div>
-      <p className="mt-2 text-gray-700">{description}</p>
-      <div className="mt-4 flex items-center justify-between">
-        <button
-          onClick={handleVote}
-          disabled={!session || isVoting}
-          className={`inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md ${
-            hasVoted
-              ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50`}
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">{feature.title}</h3>
+        <span
+          className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[feature.status]}`}
         >
-          {isVoting ? 'Processing...' : hasVoted ? 'Remove Vote' : 'Vote'}
-        </button>
-        <span className="text-sm text-gray-600">
-          {voteCount} {voteCount === 1 ? 'vote' : 'votes'}
+          {feature.status.replace('_', ' ')}
         </span>
+      </div>
+      <p className="text-gray-600 mb-4">{feature.description}</p>
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <div>
+          <span>By {feature.user?.name || 'Anonymous'}</span>
+          <span className="mx-2">•</span>
+          <span>{formatDistanceToNow(new Date(feature.createdAt), { addSuffix: true })}</span>
+        </div>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleVote}
+            disabled={isUpdating}
+            className={`flex items-center space-x-1 ${
+              hasVoted ? 'text-blue-600' : 'text-gray-500'
+            } hover:text-blue-700 disabled:opacity-50`}
+          >
+            <svg
+              className="w-5 h-5"
+              fill={hasVoted ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 15l7-7 7 7"
+              />
+            </svg>
+            <span>{feature.votes.length}</span>
+          </button>
+          {isAdmin && (
+            <select
+              value={feature.status}
+              onChange={handleStatusChange}
+              disabled={isUpdating}
+              className="text-sm border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+            >
+              {statusOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,14 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { FeatureRequestModal } from '@/components/feature-request-modal';
-import { FeatureFilters } from '@/components/feature-filters';
-import { useRouter } from 'next/navigation';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FeatureStatus, FeatureRequest, Vote } from '@prisma/client';
-import { signOut } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
 import { FeatureRequestCard } from '@/components/feature-request-card';
+import { FeatureFilters } from '@/components/feature-filters';
+import { FeatureRequestModal } from '@/components/feature-request-modal';
+import { FeatureStatus, FeatureRequest, Vote } from '@prisma/client';
 
 type FeatureWithVotes = FeatureRequest & {
   votes: Vote[];
@@ -18,53 +14,96 @@ type FeatureWithVotes = FeatureRequest & {
   } | null;
 };
 
-type SessionUser = {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
+type Filters = {
+  status: FeatureStatus | 'ALL';
+  sortBy: 'newest' | 'oldest' | 'votes';
 };
-
-class FeatureError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'FeatureError';
-  }
-}
 
 export default function FeaturesPage() {
   const { data: session } = useSession();
-  const user = session?.user as SessionUser;
-  const router = useRouter();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [features, setFeatures] = useState<FeatureWithVotes[]>([]);
-  const [filters, setFilters] = useState<{
-    status: FeatureStatus | 'ALL';
-    sortBy: 'votes' | 'newest' | 'oldest';
-  }>({
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>({
     status: 'ALL',
-    sortBy: 'votes',
+    sortBy: 'newest',
   });
-
-  useEffect(() => {
-    fetchFeatures();
-  }, [filters]);
 
   const fetchFeatures = async () => {
     try {
-      const response = await fetch(
-        `/api/features?status=${filters.status}&sortBy=${filters.sortBy}`
-      );
+      const response = await fetch('/api/features');
       if (!response.ok) {
-        throw new FeatureError('Failed to load feature requests');
+        throw new Error('Failed to load feature requests');
       }
       const data = await response.json();
       setFeatures(data);
-    } catch (error) {
-      console.error('Error fetching features:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load feature requests');
+    } catch (err) {
+      console.error('Error fetching features:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchFeatures();
+  }, []);
+
+  const handleVote = async (id: string) => {
+    if (!session) return;
+    try {
+      const response = await fetch(`/api/features/${id}/vote`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to vote');
+      }
+      await fetchFeatures();
+    } catch (err) {
+      console.error('Error voting:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleRemoveVote = async (id: string) => {
+    if (!session) return;
+    try {
+      const response = await fetch(`/api/features/${id}/vote`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to remove vote');
+      }
+      await fetchFeatures();
+    } catch (err) {
+      console.error('Error removing vote:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, status: FeatureStatus) => {
+    if (!session) return;
+    try {
+      const response = await fetch(`/api/features/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update status');
+      }
+      await fetchFeatures();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    }
+  };
+
+  const handleFilterChange = (newFilters: Filters) => {
+    setFilters(newFilters);
   };
 
   const handleCreateFeature = async (data: {
@@ -75,7 +114,6 @@ export default function FeaturesPage() {
     attachments?: File[];
   }) => {
     try {
-      setError(null);
       const formData = new FormData();
       formData.append('title', data.title);
       formData.append('description', data.description);
@@ -83,8 +121,8 @@ export default function FeaturesPage() {
       formData.append('priority', data.priority);
 
       if (data.attachments) {
-        data.attachments.forEach((file, index) => {
-          formData.append(`attachments`, file);
+        data.attachments.forEach(file => {
+          formData.append('attachments', file);
         });
       }
 
@@ -94,150 +132,88 @@ export default function FeaturesPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new FeatureError(error.error || 'Failed to create feature request');
+        throw new Error('Failed to create feature request');
       }
 
+      await fetchFeatures();
       setIsModalOpen(false);
-      fetchFeatures();
-    } catch (error) {
-      console.error('Error creating feature:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create feature request');
+    } catch (err) {
+      console.error('Error creating feature:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  const handleVote = async (id: string) => {
-    try {
-      const response = await fetch(`/api/features/${id}/vote`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) {
-        throw new FeatureError('Failed to vote');
+  const filteredAndSortedFeatures = features
+    .filter(feature => filters.status === 'ALL' || feature.status === filters.status)
+    .sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'votes':
+          return b.votes.length - a.votes.length;
+        default:
+          return 0;
       }
+    });
 
-      fetchFeatures();
-    } catch (error) {
-      console.error('Error voting:', error);
-      setError(error instanceof Error ? error.message : 'Failed to vote');
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-container">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
-  const handleRemoveVote = async (id: string) => {
-    try {
-      const response = await fetch(`/api/features/${id}/vote`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new FeatureError('Failed to remove vote');
-      }
-
-      fetchFeatures();
-    } catch (error) {
-      console.error('Error removing vote:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove vote');
-    }
-  };
-
-  const handleUpdateStatus = async (id: string, status: FeatureStatus) => {
-    try {
-      const response = await fetch(`/api/features/${id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
-
-      if (!response.ok) {
-        throw new FeatureError('Failed to update status');
-      }
-
-      fetchFeatures();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update status');
-    }
-  };
-
-  const isAdmin = user?.email?.endsWith('@yourcompany.com') || false;
+  if (error) {
+    return (
+      <div className="min-h-screen bg-container">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center text-red-600">{error}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-container min-h-screen py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="content-overlay p-8 mb-8">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Feature Requests</h1>
-            <div className="flex gap-4">
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                Submit Feature Request
-              </Button>
-              <Button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                variant="outline"
-                className="border-red-500 text-red-500 hover:bg-red-50"
-              >
-                Logout
-              </Button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4 mb-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <ExclamationTriangleIcon className="h-5 w-5 text-red-400" aria-hidden="true" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Error</h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{error}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen bg-container">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Feature Requests</h1>
+          {session && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              Submit Feature Request
+            </button>
           )}
-
-          <FeatureFilters onFilterChange={setFilters} />
         </div>
 
-        {features.length === 0 ? (
-          <div className="content-overlay p-8 text-center">
-            <p className="text-gray-600">No feature requests have been added yet.</p>
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {features.map(feature => (
-              <div key={feature.id} className="feature-card">
-                <FeatureRequestCard
-                  id={feature.id}
-                  title={feature.title}
-                  description={feature.description}
-                  status={feature.status}
-                  voteCount={feature.votes.length}
-                  createdAt={new Date(feature.createdAt).toISOString()}
-                  creator={{ name: feature.user?.name || null }}
-                  hasVoted={feature.votes.some(vote => vote.userId === user?.id)}
-                  onVote={handleVote}
-                  onRemoveVote={handleRemoveVote}
-                  onUpdateStatus={handleUpdateStatus}
-                  isAdmin={isAdmin}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        <FeatureFilters filters={filters} onFilterChange={handleFilterChange} />
 
-      <FeatureRequestModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateFeature}
-      />
+        <div className="mt-8 space-y-6">
+          {filteredAndSortedFeatures.map(feature => (
+            <FeatureRequestCard
+              key={feature.id}
+              feature={feature}
+              onVote={handleVote}
+              onRemoveVote={handleRemoveVote}
+              onUpdateStatus={handleUpdateStatus}
+              currentUser={session?.user || { id: '' }}
+            />
+          ))}
+        </div>
+
+        <FeatureRequestModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleCreateFeature}
+        />
+      </div>
     </div>
   );
 }

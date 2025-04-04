@@ -44,10 +44,11 @@ export async function GET() {
     return NextResponse.json(features);
   } catch (error) {
     console.error('Error fetching features:', error);
-    const status = error.message === 'Unauthorized' ? 401 : 
-                  error.message === 'Not an admin' ? 403 : 500;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch features';
+    const status = errorMessage === 'Unauthorized' ? 401 : 
+                  errorMessage === 'Not an admin' ? 403 : 500;
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch features' },
+      { error: errorMessage },
       { status }
     );
   }
@@ -67,10 +68,11 @@ export async function DELETE() {
     return NextResponse.json({ message: 'All features deleted successfully' });
   } catch (error) {
     console.error('Error deleting features:', error);
-    const status = error.message === 'Unauthorized' ? 401 : 
-                  error.message === 'Not an admin' ? 403 : 500;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete features';
+    const status = errorMessage === 'Unauthorized' ? 401 : 
+                  errorMessage === 'Not an admin' ? 403 : 500;
     return NextResponse.json(
-      { error: error.message || 'Failed to delete features' },
+      { error: errorMessage },
       { status }
     );
   }

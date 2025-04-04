@@ -16,7 +16,7 @@ type FeatureWithVotes = FeatureRequest & {
   votes: Vote[];
   user: {
     name: string | null;
-  };
+  } | null;
 };
 
 class FeatureListError extends Error {
@@ -53,12 +53,7 @@ async function getFeatureRequests(userId?: string, filters?: FeatureListProps) {
       orderBy,
     });
 
-    return requests.map(request => ({
-      ...request,
-      voteCount: request.votes.length,
-      hasVoted: request.votes.length > 0,
-      creator: request.user,
-    }));
+    return requests;
   } catch (error) {
     console.error('Error fetching feature requests:', error);
     throw new FeatureListError('Failed to load feature requests');
@@ -90,19 +85,14 @@ export default async function FeatureList({ status, sortBy }: FeatureListProps) 
 
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {featureRequests.map(request => (
+        {featureRequests.map(feature => (
           <FeatureRequestCard
-            key={request.id}
-            id={request.id}
-            title={request.title}
-            description={request.description}
-            status={request.status}
-            voteCount={request.voteCount}
-            createdAt={request.createdAt.toISOString()}
-            creator={request.creator}
-            hasVoted={request.hasVoted}
+            key={feature.id}
+            feature={feature}
             onVote={async () => {}}
             onRemoveVote={async () => {}}
+            onUpdateStatus={async () => {}}
+            currentUser={user || { id: '' }}
           />
         ))}
       </div>

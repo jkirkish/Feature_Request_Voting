@@ -4,26 +4,25 @@ import { useState } from 'react';
 import { FeatureStatus } from '@prisma/client';
 
 interface FeatureFiltersProps {
+  filters: {
+    status: FeatureStatus | 'ALL';
+    sortBy: 'votes' | 'newest' | 'oldest';
+  };
   onFilterChange: (filters: {
     status: FeatureStatus | 'ALL';
     sortBy: 'votes' | 'newest' | 'oldest';
   }) => void;
 }
 
-export function FeatureFilters({ onFilterChange }: FeatureFiltersProps) {
-  const [status, setStatus] = useState<FeatureStatus | 'ALL'>('ALL');
-  const [sortBy, setSortBy] = useState<'votes' | 'newest' | 'oldest'>('votes');
-
+export function FeatureFilters({ filters, onFilterChange }: FeatureFiltersProps) {
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value as FeatureStatus | 'ALL';
-    setStatus(newStatus);
-    onFilterChange({ status: newStatus, sortBy });
+    onFilterChange({ ...filters, status: newStatus });
   };
 
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSortBy = e.target.value as 'votes' | 'newest' | 'oldest';
-    setSortBy(newSortBy);
-    onFilterChange({ status, sortBy: newSortBy });
+    onFilterChange({ ...filters, sortBy: newSortBy });
   };
 
   return (
@@ -34,7 +33,7 @@ export function FeatureFilters({ onFilterChange }: FeatureFiltersProps) {
         </label>
         <select
           id="status"
-          value={status}
+          value={filters.status}
           onChange={handleStatusChange}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         >
@@ -51,7 +50,7 @@ export function FeatureFilters({ onFilterChange }: FeatureFiltersProps) {
         </label>
         <select
           id="sort"
-          value={sortBy}
+          value={filters.sortBy}
           onChange={handleSortChange}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         >

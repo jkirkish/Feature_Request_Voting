@@ -49,10 +49,11 @@ export async function DELETE(
     return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    const status = error.message === 'Unauthorized' ? 401 : 
-                  error.message === 'Not an admin' ? 403 : 500;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
+    const status = errorMessage === 'Unauthorized' ? 401 : 
+                  errorMessage === 'Not an admin' ? 403 : 500;
     return NextResponse.json(
-      { error: error.message || 'Failed to delete user' },
+      { error: errorMessage },
       { status }
     );
   }

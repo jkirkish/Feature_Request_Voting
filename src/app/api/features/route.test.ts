@@ -176,7 +176,8 @@ describe('Features API', () => {
 
       (prisma.featureRequest.findMany as jest.Mock).mockResolvedValue(mockFeatures);
 
-      const response = await GET();
+      const request = new NextRequest('http://localhost:3000/api/features');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -201,7 +202,8 @@ describe('Features API', () => {
     it('should return 401 for unauthenticated users', async () => {
       (getServerSession as jest.Mock).mockResolvedValue(null);
 
-      const response = await GET();
+      const request = new NextRequest('http://localhost:3000/api/features');
+      const response = await GET(request);
       expect(response.status).toBe(401);
     });
 
@@ -210,7 +212,8 @@ describe('Features API', () => {
         new Error('Database error')
       );
 
-      const response = await GET();
+      const request = new NextRequest('http://localhost:3000/api/features');
+      const response = await GET(request);
       expect(response.status).toBe(500);
     });
   });

@@ -46,10 +46,11 @@ export async function GET() {
     return NextResponse.json(usersWithAdminFlag);
   } catch (error) {
     console.error('Error fetching users:', error);
-    const status = error.message === 'Unauthorized' ? 401 : 
-                  error.message === 'Not an admin' ? 403 : 500;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch users';
+    const status = errorMessage === 'Unauthorized' ? 401 : 
+                  errorMessage === 'Not an admin' ? 403 : 500;
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch users' },
+      { error: errorMessage },
       { status }
     );
   }
@@ -74,10 +75,11 @@ export async function DELETE() {
     return NextResponse.json({ message: 'All non-admin users deleted successfully' });
   } catch (error) {
     console.error('Error deleting users:', error);
-    const status = error.message === 'Unauthorized' ? 401 : 
-                  error.message === 'Not an admin' ? 403 : 500;
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete users';
+    const status = errorMessage === 'Unauthorized' ? 401 : 
+                  errorMessage === 'Not an admin' ? 403 : 500;
     return NextResponse.json(
-      { error: error.message || 'Failed to delete users' },
+      { error: errorMessage },
       { status }
     );
   }
